@@ -102,7 +102,7 @@ function App(){
       const txRes=await fetch(`${ASMB}/v2/transcript`,{
         method:"POST",
         headers:{"Authorization":asmKey.trim(),"Content-Type":"application/json"},
-        body:JSON.stringify({audio_url:upload_url,language_code:"th",punctuate:true,format_text:true})
+        body:JSON.stringify({audio_url:upload_url,speech_model:"universal-2",language_code:"th",punctuate:true,format_text:true})
       });
       if(!txRes.ok){const e=await txRes.json().catch(()=>({}));throw new Error(`Transcription Error ${txRes.status}: ${e?.error||txRes.statusText}`);}
       const {id:txId}=await txRes.json();
