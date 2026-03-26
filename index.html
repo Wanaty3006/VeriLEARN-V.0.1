@@ -173,14 +173,54 @@ function App(){
     return lines;
   };
 
+  const correctTranscript = async (lines) => {
+    if(!antKey.trim()) throw new Error("กรุณาใส่ Anthropic API Key");
+    setPhase(3);setStatus("Claude กำลังแก้ไข Transcript ภาษาไทย...");
+    const raw = lines.map(l=>`${l.ts}|${l.text}`).join("\n");
+    const prompt=`คุณเป็นผู้เชี่ยวชาญด้านภาษาไทย ได้รับ Transcript ที่ถอดเสียงมาจาก AI (AssemblyAI) ซึ่งมีข้อผิดพลาดได้แก่:
+- คำสะกดผิด หรือตัดคำผิดตำแหน่ง
+- คำที่ฟังใกล้เคียงกันแต่ความหมายต่าง (เช่น "ประธาน" vs "ปราถนา")
+- คำทับศัพท์หรือคำเฉพาะที่ถอดผิด
+- การเว้นวรรคผิด
+
+กรุณาแก้ไข Transcript ด้านล่างนี้ให้ถูกต้องตามบริบท โดยรักษา Timestamp เดิมไว้เสมอ ห้ามเพิ่มหรือลดบรรทัด ห้ามเปลี่ยนความหมาย มีแต่แก้คำผิดเท่านั้น
+
+Format ของ Input และ Output คือ: timestamp|ข้อความ (แต่ละบรรทัด)
+
+Transcript:
+${raw}
+
+ตอบเฉพาะ Transcript ที่แก้แล้วในรูปแบบ timestamp|ข้อความ เท่านั้น ห้ามมีคำอธิบายหรือ markdown`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":antKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:prompt}]})
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(`Claude ${res.status}: ${e?.error?.message||res.statusText}`);}
+    const data = await res.json();
+    const text = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+    const corrected = text.split("\n").map(line=>{
+      const idx = line.indexOf("|");
+      if(idx<0) return null;
+      return {ts:line.slice(0,idx).trim(), text:line.slice(idx+1).trim()};
+    }).filter(Boolean);
+    if(corrected.length===0) throw new Error("Claude ตอบกลับในรูปแบบที่ไม่ถูกต้อง");
+    return corrected;
+  };
+
   const runTranscribe = async () => {
     if(!asmKey.trim()){setError("กรุณาใส่ AssemblyAI API Key");return;}
+    if(!antKey.trim()){setError("กรุณาใส่ Anthropic API Key (ใช้แก้ Transcript ด้วย)");return;}
     if(!file){setError("กรุณาเลือกไฟล์");return;}
     setError(""); abortRef.current=false;
     try {
       const lines = await transcribe();
       if(!lines) return;
       setTxLines(lines);
+      setProgress(85);
+      const corrected = await correctTranscript(lines);
+      setTxLines(corrected);
       setPhase(0);setProgress(0);setStatus("");
       setStep(3);
     } catch(e){
@@ -293,7 +333,7 @@ ${hasScript?`Script ต้นฉบับ (ใช้เปรียบเที�
   const STEP_LABELS=["","Criteria","Video","ตรวจ Transcript","ผลลัพธ์"];
   const scoreBg=result?(result.score>=80?"#eaf3de":result.score>=60?"#faeeda":"#fcebeb"):"#f1efe8";
   const scoreColor=result?(result.score>=80?"#27500a":result.score>=60?"#633806":"#791f1f"):"#888";
-  const PHASE_LBL=["","อัปโหลดไฟล์","ถอดเสียง","วิเคราะห์","เสร็จ"];
+  const PHASE_LBL=["","อัปโหลดไฟล์","ถอดเสียง","Claude แก้ Transcript","เสร็จ"];
 
   return(
     <div style={{maxWidth:740,margin:"0 auto"}}>
@@ -322,7 +362,10 @@ ${hasScript?`Script ต้นฉบับ (ใช้เปรียบเที�
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
-            <div style={{fontSize:10,color:"#888",marginBottom:3}}>AssemblyAI <span style={{background:"#e1f5ee",color:"#085041",padding:"0 4px",borderRadius:3}}>ถอดเสียง</span></div>
+                          <div style={{fontSize:11,color:"#888",marginBottom:4}}>
+              AssemblyAI <span style={{background:"#e1f5ee",color:"#085041",padding:"0 4px",borderRadius:3}}>ถอดเสียง</span>
+              <span style={{fontSize:10,color:"#aaa",marginLeft:4}}>→ Claude แก้คำผิด → User ตรวจสอบ</span>
+            </div>
             <input type={showKeys?"text":"password"} value={asmKey} onChange={e=>setAsmKey(e.target.value)} placeholder="xxxxxxxxxxxxxxxx" className="mono"/>
           </div>
           <div>
@@ -442,12 +485,15 @@ ${hasScript?`Script ต้นฉบับ (ใช้เปรียบเที�
       {/* ── Step 3: Transcript Review ── */}
       {step===3&&(
         <div className="card">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"flex-start",marginBottom:10}}>
             <div>
-              <div style={{fontSize:14,fontWeight:500,marginBottom:3}}>ตรวจสอบและแก้ไข Transcript</div>
-              <div style={{fontSize:11,color:"#888"}}>AssemblyAI ถอดมา — กรุณาแก้คำที่ผิดก่อนส่งให้ Claude วิเคราะห์</div>
+              <div style={{fontSize:14,fontWeight:500,marginBottom:3}}>ตรวจสอบ Transcript (Claude แก้แล้ว)</div>
+              <div style={{fontSize:11,color:"#888"}}>Claude แก้คำผิดจาก AssemblyAI แล้ว — กรุณาตรวจและแก้เพิ่มเติมถ้ายังผิดอยู่</div>
             </div>
-            <span style={{fontSize:10,background:"#eeedfe",color:"#3c3489",padding:"2px 8px",borderRadius:8,fontWeight:500,flexShrink:0}}>{txLines.length} บรรทัด</span>
+            <span style={{fontSize:10,background:"#eeedfe",color:"#3c3489",padding:"2px 8px",borderRadius:8,fontWeight:500,flexShrink:0,marginLeft:"auto"}}>{txLines.length} บรรทัด</span>
+          </div>
+          <div style={{background:"#eeedfe",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:11,color:"#3c3489"}}>
+            Claude แก้คำผิดจาก AssemblyAI แล้ว — แก้เพิ่มได้โดยตรงในตารางด้านล่าง แล้วกดวิเคราะห์
           </div>
 
           <div style={{border:"0.5px solid #d3d1c7",borderRadius:10,overflow:"hidden",marginBottom:14,maxHeight:360,overflowY:"auto"}}>
@@ -460,7 +506,7 @@ ${hasScript?`Script ต้นฉบับ (ใช้เปรียบเที�
           </div>
 
           <div style={{background:"#faeeda",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:11,color:"#633806"}}>
-            แก้คำผิดที่ AssemblyAI ถอดผิดในตารางด้านบนก่อน — Timestamp ซ้ายมือจะถูกนำไปใช้ใน .srt โดยตรง
+            Timestamp ซ้ายมือจะถูกนำไปใช้ใน .srt โดยตรง — ห้ามแก้ Timestamp แก้ได้เฉพาะข้อความ
           </div>
 
           {phase===3&&(
