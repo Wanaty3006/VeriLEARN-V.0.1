@@ -8,20 +8,19 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a18;min-height:100vh;padding:24px 16px}
-  textarea,input[type=text],input[type=password]{width:100%;border:0.5px solid #d3d1c7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a18;outline:none;transition:border-color .15s}
-  textarea:focus,input:focus{border-color:#888}
-  button{border:0.5px solid #d3d1c7;border-radius:8px;padding:6px 13px;font-size:12px;font-family:inherit;background:#fff;color:#1a1a18;cursor:pointer;transition:all .15s}
-  button:hover:not(:disabled){background:#f1efe8}
-  button.primary{background:#1a1a18;color:#fff;border-color:#1a1a18}
-  button.primary:hover:not(:disabled){background:#333}
-  button:disabled{opacity:.4;cursor:default}
-  .card{background:#fff;border:0.5px solid #d3d1c7;border-radius:12px;padding:16px}
-  .metric{background:#f1efe8;border-radius:8px;padding:10px 12px}
-  .mono{font-family:'Courier New',monospace}
-  a{color:#185fa5;text-decoration:none}
-  a:hover{text-decoration:underline}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a18;min-height:100vh;padding:24px 16px}
+textarea,input[type=text],input[type=password]{width:100%;border:0.5px solid #d3d1c7;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a18;outline:none;transition:border-color .15s}
+textarea:focus,input:focus{border-color:#888}
+button{border:0.5px solid #d3d1c7;border-radius:8px;padding:6px 13px;font-size:12px;font-family:inherit;background:#fff;color:#1a1a18;cursor:pointer;transition:all .15s}
+button:hover:not(:disabled){background:#f1efe8}
+button.primary{background:#1a1a18;color:#fff;border-color:#1a1a18}
+button.primary:hover:not(:disabled){background:#333}
+button:disabled{opacity:.4;cursor:default}
+.card{background:#fff;border:0.5px solid #d3d1c7;border-radius:12px;padding:16px}
+.metric{background:#f1efe8;border-radius:8px;padding:10px 12px}
+.mono{font-family:'Courier New',monospace}
+a{color:#185fa5;text-decoration:none}
 </style>
 </head>
 <body>
@@ -29,15 +28,55 @@
 <script type="text/babel">
 const {useState,useRef} = React;
 
-const RULES=[
-  {id:"spelling", label:"ตรวจคำผิด / สะกดผิด",   enabled:true},
-  {id:"content",  label:"เนื้อหาตรงกับ Script",    enabled:true},
-  {id:"complete", label:"เนื้อหาครบถ้วน",          enabled:true},
-  {id:"structure",label:"โครงสร้างการนำเสนอ",      enabled:true},
-  {id:"bad",      label:"เนื้อหาไม่เหมาะสม",       enabled:false},
+const CRITERIA = [
+  {
+    id:"education",
+    label:"การศึกษา",
+    sub:"E-Learning · บทเรียน · การบรรยาย",
+    color:"#1D9E75", bg:"#e1f5ee", border:"#9FE1CB",
+    rules:[
+      "ความถูกต้องทางวิชาการของเนื้อหา",
+      "ลำดับการนำเสนอสมเหตุสมผล",
+      "ศัพท์วิชาการและการสะกดถูกต้อง",
+      "มีบทนำ เนื้อหา และสรุป",
+      "เหมาะสมกับระดับผู้เรียน",
+      "ตัวเลขและข้อมูลอ้างอิงถูกต้อง",
+    ],
+    prompt:`คุณเป็น QA ผู้เชี่ยวชาญด้านสื่อการศึกษา ตรวจสอบโดยอ้างอิงมาตรฐาน E-Learning และหลักการสอนที่ดี เช่น ความถูกต้องทางวิชาการ ลำดับเนื้อหา ความเหมาะสมของระดับภาษา ตัวเลขและข้อมูลที่อ้างอิง`
+  },
+  {
+    id:"dev",
+    label:"สาย Dev / Technical",
+    sub:"Tutorial · Coding · Technical Guide",
+    color:"#534AB7", bg:"#eeedfe", border:"#AFA9EC",
+    rules:[
+      "Code Syntax ถูกต้องตาม Language",
+      "ชื่อ Function / Library / Framework ถูก",
+      "ขั้นตอนทำตามได้จริง ไม่ขาดหาย",
+      "Version ของ Tool ระบุชัดเจน",
+      "Best Practice และ Security ถูกต้อง",
+      "Output / Result ที่บอกสอดคล้องกับ Code",
+    ],
+    prompt:`คุณเป็น Senior Developer ที่รีวิว Technical Content ตรวจสอบ Code Syntax, ชื่อ API/Library/Framework, ความถูกต้องของขั้นตอน, Version ที่ระบุ, Best Practice และ Security`
+  },
+  {
+    id:"general",
+    label:"คอนเทนต์ทั่วไป",
+    sub:"YouTube · Podcast · Presentation",
+    color:"#BA7517", bg:"#faeeda", border:"#FAC775",
+    rules:[
+      "ข้อมูลถูกต้อง ไม่บิดเบือนหรือเป็นเท็จ",
+      "เนื้อหาเหมาะสมกับแพลตฟอร์มและกลุ่มเป้าหมาย",
+      "Flow การนำเสนอน่าติดตาม",
+      "ไม่มีเนื้อหาอ่อนไหวหรือไม่เหมาะสม",
+      "Engagement Hook มีในช่วงต้น",
+      "Call to Action ชัดเจน (ถ้ามี)",
+    ],
+    prompt:`คุณเป็น Content Strategist ที่รีวิวสื่อดิจิทัล ตรวจสอบความถูกต้องของข้อมูล ความเหมาะสมของเนื้อหา Flow การนำเสนอ Engagement และ Call to Action`
+  }
 ];
 
-const ASMB="https://api.assemblyai.com";
+const ASMB = "https://api.assemblyai.com";
 
 function Toggle({on,onChange}){
   return <div onClick={onChange} style={{width:32,height:18,borderRadius:9,background:on?"#1D9E75":"#b4b2a9",position:"relative",cursor:"pointer",flexShrink:0,transition:"background .2s"}}>
@@ -45,11 +84,8 @@ function Toggle({on,onChange}){
   </div>;
 }
 
-function fmtSec(s){
-  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;
-  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")},000`;
-}
-function msToMmss(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60),sc=s%60;return `${m}:${String(sc).padStart(2,"0")}`;}
+function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")},000`;}
+function msToMmss(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60),sc=s%60;return`${m}:${String(sc).padStart(2,"0")}`;}
 function tsToSec(ts="0:00"){const p=ts.trim().split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+(p[1]||0);}
 
 function App(){
@@ -57,235 +93,336 @@ function App(){
   const [antKey,setAntKey]=useState("");
   const [showKeys,setShowKeys]=useState(false);
   const [step,setStep]=useState(1);
+  const [criteria,setCriteria]=useState(null);
+  const [extraRules,setExtraRules]=useState([]);
+  const [newRule,setNewRule]=useState("");
   const [file,setFile]=useState(null);
   const [script,setScript]=useState("");
-  const [rules,setRules]=useState(RULES);
   const [phase,setPhase]=useState(0);
   const [progress,setProgress]=useState(0);
   const [status,setStatus]=useState("");
-  const [transcript,setTranscript]=useState("");
+  const [txLines,setTxLines]=useState([]);
   const [result,setResult]=useState(null);
   const [error,setError]=useState("");
-  const [activeTab,setActiveTab]=useState("report");
+  const [activeTab,setActiveTab]=useState("issues");
   const fileRef=useRef();
   const abortRef=useRef(false);
 
-  const toggleRule=id=>setRules(r=>r.map(x=>x.id===id?{...x,enabled:!x.enabled}:x));
+  const crit = CRITERIA.find(c=>c.id===criteria);
 
-  const onFile=e=>{
-    const f=e.target.files?.[0];
-    if(!f) return;
-    if(!f.type.startsWith("video/")&&!f.type.startsWith("audio/")){setError("รองรับเฉพาะ Video หรือ Audio เท่านั้น");return;}
-    setFile(f);setError("");
+  // Upload + transcribe
+  const transcribe = async () => {
+    if(!asmKey.trim()) throw new Error("กรุณาใส่ AssemblyAI API Key");
+    if(!file) throw new Error("กรุณาเลือกไฟล์");
+
+    setPhase(1);setProgress(5);setStatus("กำลังอัปโหลดไฟล์...");
+    const upRes = await fetch(`${ASMB}/v2/upload`,{
+      method:"POST",
+      headers:{"Authorization":asmKey.trim(),"Content-Type":"application/octet-stream"},
+      body:file
+    });
+    if(!upRes.ok){const e=await upRes.json().catch(()=>({}));throw new Error(`Upload Error: ${e?.error||upRes.statusText}`);}
+    const {upload_url} = await upRes.json();
+    if(abortRef.current) return null;
+
+    setPhase(2);setProgress(15);setStatus("กำลังถอดเสียงภาษาไทย (Word-level)...");
+    const txRes = await fetch(`${ASMB}/v2/transcript`,{
+      method:"POST",
+      headers:{"Authorization":asmKey.trim(),"Content-Type":"application/json"},
+      body:JSON.stringify({
+        audio_url:upload_url,
+        speech_models:["universal-2"],
+        language_code:"th",
+        punctuate:true,
+        format_text:true,
+      })
+    });
+    if(!txRes.ok){const e=await txRes.json().catch(()=>({}));throw new Error(`Transcription Error: ${e?.error||txRes.statusText}`);}
+    const {id:txId} = await txRes.json();
+
+    let txData=null, poll=0;
+    while(true){
+      if(abortRef.current) return null;
+      await new Promise(r=>setTimeout(r,3000));
+      poll++;
+      const p = await fetch(`${ASMB}/v2/transcript/${txId}`,{headers:{"Authorization":asmKey.trim()}});
+      txData = await p.json();
+      setProgress(Math.min(15+poll*7,78));
+      if(txData.status==="completed") break;
+      if(txData.status==="error") throw new Error("AssemblyAI: "+txData.error);
+      setStatus(`ถอดเสียงอยู่... (${txData.status})`);
+    }
+
+    // Build word-level timestamped lines (~10 words per line)
+    let lines = [];
+    if(txData.words?.length){
+      let chunk=[],cs=0;
+      txData.words.forEach((w,i)=>{
+        if(!chunk.length) cs=w.start;
+        chunk.push(w.text);
+        if(chunk.length>=10 || i===txData.words.length-1){
+          lines.push({ts:msToMmss(cs), text:chunk.join(" ")});
+          chunk=[];
+        }
+      });
+    } else if(txData.utterances?.length){
+      lines = txData.utterances.map(u=>({ts:msToMmss(u.start), text:u.text}));
+    } else {
+      lines = [{ts:"0:00", text:txData.text||""}];
+    }
+    return lines;
   };
 
-  const run=async()=>{
+  const runTranscribe = async () => {
     if(!asmKey.trim()){setError("กรุณาใส่ AssemblyAI API Key");return;}
-    if(!antKey.trim()){setError("กรุณาใส่ Anthropic API Key");return;}
-    if(!file){setError("กรุณาเลือกไฟล์ก่อน");return;}
-    setError("");setResult(null);setTranscript("");abortRef.current=false;
-
-    try{
-      // Phase 1: Upload
-      setPhase(1);setProgress(5);setStatus("กำลังอัปโหลดไฟล์...");
-      const uploadRes=await fetch(`${ASMB}/v2/upload`,{
-        method:"POST",
-        headers:{"Authorization":asmKey.trim(),"Content-Type":"application/octet-stream"},
-        body:file
-      });
-      if(!uploadRes.ok){const e=await uploadRes.json().catch(()=>({}));throw new Error(`Upload Error ${uploadRes.status}: ${e?.error||uploadRes.statusText}`);}
-      const {upload_url}=await uploadRes.json();
-      if(abortRef.current) return;
-
-      // Phase 2: Request transcription
-      setPhase(2);setProgress(15);setStatus("เริ่มถอดเสียงภาษาไทย...");
-      const txRes=await fetch(`${ASMB}/v2/transcript`,{
-        method:"POST",
-        headers:{"Authorization":asmKey.trim(),"Content-Type":"application/json"},
-        body:JSON.stringify({audio_url:upload_url,speech_models:["universal-2"],language_code:"th",punctuate:true,format_text:true})
-      });
-      if(!txRes.ok){const e=await txRes.json().catch(()=>({}));throw new Error(`Transcription Error ${txRes.status}: ${e?.error||txRes.statusText}`);}
-      const {id:txId}=await txRes.json();
-
-      // Phase 2: Poll
-      let txData=null,poll=0;
-      while(true){
-        if(abortRef.current) return;
-        await new Promise(r=>setTimeout(r,3000));
-        poll++;
-        const p=await fetch(`${ASMB}/v2/transcript/${txId}`,{headers:{"Authorization":asmKey.trim()}});
-        txData=await p.json();
-        setProgress(Math.min(15+poll*7,78));
-        if(txData.status==="completed") break;
-        if(txData.status==="error") throw new Error("AssemblyAI: "+txData.error);
-        setStatus(`กำลังถอดเสียง... (${txData.status})`);
-      }
-
-      // Build transcript
-      let txText="";
-      if(txData.utterances?.length){
-        txText=txData.utterances.map(u=>`${msToMmss(u.start)} ${u.text}`).join("\n");
-      } else if(txData.words?.length){
-        const chunks=[];let chunk=[],cs=0;
-        txData.words.forEach((w,i)=>{
-          if(!chunk.length) cs=w.start;
-          chunk.push(w.text);
-          if(chunk.length>=15||i===txData.words.length-1){chunks.push({start:cs,text:chunk.join(" ")});chunk=[];}
-        });
-        txText=chunks.map(c=>`${msToMmss(c.start)} ${c.text}`).join("\n");
-      } else { txText=txData.text||""; }
-      setTranscript(txText);
-      if(abortRef.current) return;
-
-      // Phase 3: Claude
-      setPhase(3);setProgress(82);setStatus("ถอดเสียงเสร็จแล้ว กำลังวิเคราะห์ด้วย Claude...");
-      const enabled=rules.filter(r=>r.enabled).map(r=>r.label).join(", ");
-      const prompt=`คุณคือ AI ระบบตรวจสอบคุณภาพสื่อ E-Learning ภาษาไทย
-
-Transcript จาก Video (ถอดเสียงโดย AssemblyAI):
-${txText}
-
-${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Script ต้นฉบับ"}
-
-Checklist: ${enabled}
-
-วิเคราะห์แล้วตอบเป็น JSON เท่านั้น ห้ามมี markdown:
-{"score":<0-100>,"summary":"<สรุป>","issues":[{"timestamp":"<MM:SS>","type":"<คำผิด|เนื้อหา|โครงสร้าง|ข้อมูลผิด|เนื้อหาขาด>","severity":"<critical|warning|info>","description":"<ปัญหา>","suggestion":"<แนะนำ>"}],"passed":["<ผ่าน>"],"stats":{"total_issues":<n>,"critical":<n>,"warning":<n>,"info":<n>}}`;
-
-      const cRes=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":antKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:prompt}]})
-      });
-      if(!cRes.ok){const e=await cRes.json().catch(()=>({}));throw new Error(`Claude ${cRes.status}: ${e?.error?.message||cRes.statusText}`);}
-      const cData=await cRes.json();
-      const raw=(cData.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-      const m=raw.match(/\{[\s\S]*\}/);
-      if(!m) throw new Error("ไม่พบ JSON ในผลลัพธ์");
-      const parsed=JSON.parse(m[0]);
-      if(!parsed.issues||parsed.score===undefined) throw new Error("ข้อมูลไม่ครบ");
-      setResult(parsed);setPhase(4);setProgress(100);setStatus("");setStep(3);
+    if(!file){setError("กรุณาเลือกไฟล์");return;}
+    setError(""); abortRef.current=false;
+    try {
+      const lines = await transcribe();
+      if(!lines) return;
+      setTxLines(lines);
+      setPhase(0);setProgress(0);setStatus("");
+      setStep(3);
     } catch(e){
       if(!abortRef.current) setError(e.message);
       setPhase(0);setProgress(0);setStatus("");
     }
   };
 
-  const stop=()=>{abortRef.current=true;setPhase(0);setProgress(0);setStatus("");setError("หยุดการประมวลผล");};
+  const runAnalysis = async () => {
+    if(!antKey.trim()){setError("กรุณาใส่ Anthropic API Key");return;}
+    setError("");setResult(null);
+    setPhase(3);setStatus("กำลังวิเคราะห์ด้วย Claude AI...");
+
+    const txText = txLines.map(l=>`${l.ts} ${l.text}`).join("\n");
+    const allRules = [...(crit?.rules||[]), ...extraRules].map((r,i)=>`${i+1}. ${r}`).join("\n");
+    const hasScript = script.trim().length>0;
+
+    const prompt=`${crit?.prompt||"คุณเป็น QA ผู้เชี่ยวชาญด้านสื่อวิดีโอ"}
+
+ตรวจสอบ Transcript ต่อไปนี้ตาม Criteria: ${crit?.label||"ทั่วไป"}
+
+Criteria Rules:
+${allRules}
+
+Transcript (พร้อม Timestamp):
+${txText}
+
+${hasScript?`Script ต้นฉบับ (ใช้เปรียบเทียบ):\n${script}`:
+`ไม่มี Script — ให้ใช้ Domain Knowledge และ Criteria ด้านบนวิเคราะห์`}
+
+ผลลัพธ์ที่ต้องการ:
+1. Issues: ปัญหาที่พบพร้อม Timestamp จาก Transcript
+2. Suggestions: คำแนะนำเชิงปรับปรุงจาก Domain Knowledge (ไม่ต้องมี Script)
+3. Score และ Summary
+
+ตอบเป็น JSON เท่านั้น ห้ามมี markdown:
+{
+  "score": <0-100>,
+  "summary": "<สรุป 1-2 ประโยค>",
+  "issues": [
+    {
+      "timestamp": "<MM:SS จาก Transcript>",
+      "type": "<คำผิด|ข้อมูลผิด|เนื้อหาขาด|โครงสร้าง|Code ผิด|ไม่เหมาะสม>",
+      "severity": "<critical|warning|info>",
+      "description": "<อธิบายปัญหาชัดเจน>",
+      "suggestion": "<แนะนำวิธีแก้ไข>"
+    }
+  ],
+  "suggestions": [
+    {
+      "topic": "<หัวข้อ>",
+      "detail": "<คำแนะนำจาก Domain Knowledge>",
+      "priority": "<high|medium|low>"
+    }
+  ],
+  "passed": ["<สิ่งที่ดีและผ่านเกณฑ์>"],
+  "stats": {
+    "total_issues": <n>,
+    "critical": <n>,
+    "warning": <n>,
+    "info": <n>
+  }
+}`;
+
+    try {
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":antKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:3000,messages:[{role:"user",content:prompt}]})
+      });
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(`Claude ${res.status}: ${e?.error?.message||res.statusText}`);}
+      const data=await res.json();
+      const raw=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      const m=raw.match(/\{[\s\S]*\}/);
+      if(!m) throw new Error("ไม่พบ JSON ในผลลัพธ์");
+      const parsed=JSON.parse(m[0]);
+      setResult(parsed);setPhase(4);setStatus("");setStep(4);
+    } catch(e){
+      setError(e.message);
+    } finally {
+      if(phase!==4){setPhase(0);setStatus("");}
+    }
+  };
 
   const downloadSrt=()=>{
-    const lines=(result?.issues||[]).map((iss,i)=>{const s=tsToSec(iss.timestamp),e=s+4;return `${i+1}\n${fmtSec(s)} --> ${fmtSec(e)}\n[${iss.type}] ${iss.description}`;});
+    const lines=(result?.issues||[]).map((iss,i)=>{const s=tsToSec(iss.timestamp),e=s+4;return`${i+1}\n${fmtSec(s)} --> ${fmtSec(e)}\n[${iss.type}] ${iss.description}`;});
     const blob=new Blob([lines.join("\n\n")],{type:"text/plain;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="verilearn_markers.srt";a.click();URL.revokeObjectURL(url);
   };
 
+  const downloadReport=()=>{
+    if(!result) return;
+    const txText=txLines.map(l=>`${l.ts} ${l.text}`).join("\n");
+    const lines=[
+      `VeriLearn QA Report`,`Criteria: ${crit?.label}`,`Score: ${result.score}/100`,``,
+      `Summary: ${result.summary}`,``,
+      `=== Issues (${result.stats.total_issues}) ===`,
+      ...(result.issues||[]).map(i=>`[${i.timestamp}] [${i.severity.toUpperCase()}] ${i.type}\n  ${i.description}\n  แนะนำ: ${i.suggestion}`),
+      ``,`=== Suggestions ===`,
+      ...(result.suggestions||[]).map(s=>`[${s.priority.toUpperCase()}] ${s.topic}\n  ${s.detail}`),
+      ``,`=== Passed ===`,
+      ...(result.passed||[]).map(p=>`✓ ${p}`),
+      ``,`=== Transcript ===`,txText
+    ];
+    const blob=new Blob([lines.join("\n")],{type:"text/plain;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="verilearn_report.txt";a.click();URL.revokeObjectURL(url);
+  };
+
   const loading=phase>0&&phase<4;
-  const PHASE_LBL=["","อัปโหลดไฟล์","ถอดเสียง","วิเคราะห์","เสร็จสิ้น"];
+  const STEP_LABELS=["","Criteria","Video","ตรวจ Transcript","ผลลัพธ์"];
   const scoreBg=result?(result.score>=80?"#eaf3de":result.score>=60?"#faeeda":"#fcebeb"):"#f1efe8";
   const scoreColor=result?(result.score>=80?"#27500a":result.score>=60?"#633806":"#791f1f"):"#888";
+  const PHASE_LBL=["","อัปโหลดไฟล์","ถอดเสียง","วิเคราะห์","เสร็จ"];
 
   return(
     <div style={{maxWidth:740,margin:"0 auto"}}>
 
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{width:10,height:10,borderRadius:"50%",background:"#5DCAA5"}}/>
           <span style={{fontSize:16,fontWeight:500}}>VeriLearn</span>
-          <span style={{fontSize:10,background:"#e1f5ee",color:"#085041",padding:"1px 7px",borderRadius:10,fontWeight:500}}>v3 · Video</span>
+          <span style={{fontSize:10,background:"#e1f5ee",color:"#085041",padding:"1px 7px",borderRadius:10,fontWeight:500}}>v4</span>
+          {crit && <span style={{fontSize:10,background:crit.bg,color:crit.color,padding:"1px 7px",borderRadius:10,fontWeight:500,border:`0.5px solid ${crit.border}`}}>{crit.label}</span>}
         </div>
-        <div style={{display:"flex",gap:6}}>
-          {[["1 · อัปโหลด",1],["2 · Checklist",2],["3 · ผลลัพธ์",3]].map(([lbl,s])=>(
-            <button key={s} onClick={()=>s<=step&&!loading&&setStep(s)} style={{fontSize:11,padding:"4px 12px",background:step===s?"#1a1a18":"transparent",color:step===s?"#fff":"#888",borderColor:step===s?"#1a1a18":"#d3d1c7",borderRadius:20,opacity:s>step?.4:1,cursor:s>step||loading?"default":"pointer"}}>{lbl}</button>
-          ))}
+        <div style={{display:"flex",gap:5}}>
+          {STEP_LABELS.slice(1).map((lbl,i)=>{
+            const s=i+1;
+            return <button key={s} onClick={()=>s<=step&&!loading&&setStep(s)} style={{fontSize:10,padding:"3px 10px",background:step===s?"#1a1a18":"transparent",color:step===s?"#fff":"#888",borderColor:step===s?"#1a1a18":"#d3d1c7",borderRadius:16,opacity:s>step?.4:1,cursor:s>step||loading?"default":"pointer"}}>{s}·{lbl}</button>;
+          })}
         </div>
       </div>
 
       {/* API Keys */}
-      <div className="card" style={{marginBottom:16}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <span style={{fontSize:12,fontWeight:500,color:"#555"}}>API Keys</span>
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <span style={{fontSize:11,fontWeight:500,color:"#555"}}>API Keys</span>
           <button onClick={()=>setShowKeys(v=>!v)} style={{fontSize:10,padding:"2px 8px"}}>{showKeys?"ซ่อน":"แสดง"}</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
-            <div style={{fontSize:10,color:"#888",marginBottom:4}}>AssemblyAI <span style={{background:"#e1f5ee",color:"#085041",padding:"0 4px",borderRadius:3}}>ถอดเสียง</span></div>
-            <input type={showKeys?"text":"password"} value={asmKey} onChange={e=>setAsmKey(e.target.value)} placeholder="xxxxxxxxxxxxxxxxxxxxxxxx" className="mono"/>
+            <div style={{fontSize:10,color:"#888",marginBottom:3}}>AssemblyAI <span style={{background:"#e1f5ee",color:"#085041",padding:"0 4px",borderRadius:3}}>ถอดเสียง</span></div>
+            <input type={showKeys?"text":"password"} value={asmKey} onChange={e=>setAsmKey(e.target.value)} placeholder="xxxxxxxxxxxxxxxx" className="mono"/>
           </div>
           <div>
-            <div style={{fontSize:10,color:"#888",marginBottom:4}}>Anthropic <span style={{background:"#eeedfe",color:"#3c3489",padding:"0 4px",borderRadius:3}}>วิเคราะห์</span></div>
+            <div style={{fontSize:10,color:"#888",marginBottom:3}}>Anthropic <span style={{background:"#eeedfe",color:"#3c3489",padding:"0 4px",borderRadius:3}}>วิเคราะห์</span></div>
             <input type={showKeys?"text":"password"} value={antKey} onChange={e=>setAntKey(e.target.value)} placeholder="sk-ant-api03-..." className="mono"/>
           </div>
         </div>
-        <div style={{display:"flex",gap:16,marginTop:8,fontSize:10,color:"#999"}}>
-          <a href="https://www.assemblyai.com/dashboard/signup" target="_blank">ขอ AssemblyAI Key ↗ (Free 5 ชม.)</a>
+        <div style={{display:"flex",gap:14,marginTop:7,fontSize:10,color:"#aaa"}}>
+          <a href="https://www.assemblyai.com/dashboard/signup" target="_blank">ขอ AssemblyAI Key ↗ (Free)</a>
           <a href="https://console.anthropic.com/settings/keys" target="_blank">ขอ Anthropic Key ↗</a>
-          <span>* Keys ไม่ถูกบันทึก</span>
         </div>
       </div>
 
-      {/* Step 1 */}
+      {/* ── Step 1: Criteria ── */}
       {step===1&&(
         <div className="card">
-          <p style={{fontSize:13,color:"#555",marginBottom:14}}>อัปโหลด Video หรือ Audio ที่ต้องการตรวจสอบ</p>
-          <div onClick={()=>fileRef.current?.click()} style={{border:`1.5px dashed ${file?"#1D9E75":"#d3d1c7"}`,borderRadius:10,padding:"24px 16px",textAlign:"center",cursor:"pointer",background:file?"#e1f5ee":"#f8f8f6",marginBottom:12}}>
-            <input ref={fileRef} type="file" accept="video/*,audio/*" onChange={onFile} style={{display:"none"}}/>
-            {file?(
-              <div>
-                <div style={{width:30,height:30,borderRadius:"50%",background:"#1D9E75",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 7px"}}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5l3 3 7-7" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                <div style={{fontSize:13,fontWeight:500,color:"#085041"}}>{file.name}</div>
-                <div style={{fontSize:11,color:"#0f6e56",marginTop:2}}>{(file.size/1024/1024).toFixed(1)} MB · คลิกเพื่อเปลี่ยน</div>
-              </div>
-            ):(
-              <div>
-                <div style={{fontSize:13,fontWeight:500,color:"#888",marginBottom:3}}>คลิกเพื่อเลือกไฟล์</div>
-                <div style={{fontSize:11,color:"#aaa"}}>MP4, MOV, MP3, M4A, WAV — ไม่จำกัดขนาด</div>
-              </div>
-            )}
-          </div>
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:10,color:"#888",marginBottom:4}}>Script ต้นฉบับ <span style={{background:"#e6f1fb",color:"#0c447c",padding:"0 5px",borderRadius:3,fontSize:10}}>แนะนำ</span></div>
-            <textarea value={script} onChange={e=>setScript(e.target.value)} placeholder="วาง Script ต้นฉบับเพื่อให้ AI เปรียบเทียบได้แม่นยำขึ้น..." style={{height:70,lineHeight:1.6,fontFamily:"monospace",fontSize:12}}/>
-          </div>
-          {error&&<div style={{background:"#fcebeb",color:"#791f1f",fontSize:12,padding:"8px 12px",borderRadius:8,marginBottom:10}}>{error}</div>}
-          <button className="primary" disabled={!file} onClick={()=>{if(!file){setError("เลือกไฟล์ก่อน");return;}setError("");setStep(2);}}>ถัดไป: ตั้งค่า Checklist →</button>
-        </div>
-      )}
-
-      {/* Step 2 */}
-      {step===2&&(
-        <div className="card">
-          <p style={{fontSize:13,color:"#555",marginBottom:12}}>เลือก Rule ที่ต้องการตรวจสอบ</p>
-          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
-            {rules.map(r=>(
-              <div key={r.id} onClick={()=>!loading&&toggleRule(r.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 13px",border:`0.5px solid ${r.enabled?"#b4b2a9":"#e8e6e0"}`,borderRadius:10,cursor:loading?"default":"pointer"}}>
-                <Toggle on={r.enabled} onChange={()=>!loading&&toggleRule(r.id)}/>
-                <span style={{fontSize:13,color:r.enabled?"#1a1a18":"#aaa",fontWeight:r.enabled?500:400}}>{r.label}</span>
+          <p style={{fontSize:13,color:"#555",marginBottom:14}}>เลือกประเภทของสื่อที่ต้องการตรวจสอบ — Claude จะใช้มาตรฐานของแต่ละ Domain</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+            {CRITERIA.map(c=>(
+              <div key={c.id} onClick={()=>setCriteria(c.id)} style={{border:`${criteria===c.id?`2px solid ${c.color}`:"0.5px solid #d3d1c7"}`,borderRadius:10,padding:12,cursor:"pointer",background:criteria===c.id?c.bg:"#fff",transition:"all .15s"}}>
+                <div style={{fontSize:13,fontWeight:500,color:c.color,marginBottom:2}}>{c.label}</div>
+                <div style={{fontSize:10,color:"#888",marginBottom:8}}>{c.sub}</div>
+                {c.rules.slice(0,3).map((r,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:3}}>
+                    <div style={{width:5,height:5,borderRadius:"50%",background:c.color,flexShrink:0,marginTop:4}}/>
+                    <span style={{fontSize:10,color:"#555",lineHeight:1.4}}>{r}</span>
+                  </div>
+                ))}
+                <div style={{fontSize:10,color:"#aaa",marginTop:3}}>+ {c.rules.length-3} เกณฑ์อื่น...</div>
               </div>
             ))}
           </div>
 
+          {criteria&&(
+            <div style={{border:"0.5px solid #d3d1c7",borderRadius:10,padding:12,marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:500,color:"#555",marginBottom:8}}>เกณฑ์ทั้งหมดของ "{crit?.label}" ({crit?.rules.length} ข้อ)</div>
+              {crit?.rules.map((r,i)=>(
+                <div key={i} style={{display:"flex",gap:6,marginBottom:4,fontSize:11,color:"#555"}}>
+                  <span style={{color:crit.color,fontWeight:500}}>{i+1}.</span>{r}
+                </div>
+              ))}
+              <div style={{borderTop:"0.5px solid #e8e6e0",paddingTop:10,marginTop:10}}>
+                <div style={{fontSize:11,fontWeight:500,color:"#555",marginBottom:6}}>+ เพิ่มเกณฑ์เอง</div>
+                <div style={{display:"flex",gap:6}}>
+                  <input type="text" value={newRule} onChange={e=>setNewRule(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newRule.trim()){setExtraRules(r=>[...r,newRule.trim()]);setNewRule("");}}} placeholder="พิมพ์แล้วกด Enter..."/>
+                  <button onClick={()=>{if(newRule.trim()){setExtraRules(r=>[...r,newRule.trim()]);setNewRule("");}}} style={{flexShrink:0}}>เพิ่ม</button>
+                </div>
+                {extraRules.map((r,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"4px 8px",background:"#f1efe8",borderRadius:6,marginTop:5,fontSize:11}}>
+                    <span>{r}</span>
+                    <button onClick={()=>setExtraRules(rs=>rs.filter((_,j)=>j!==i))} style={{fontSize:10,padding:"1px 6px",color:"#e24b4a",border:"0.5px solid #f09595",borderRadius:4}}>ลบ</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button className="primary" disabled={!criteria} onClick={()=>setStep(2)}>ถัดไป: อัปโหลด Video →</button>
+        </div>
+      )}
+
+      {/* ── Step 2: Upload ── */}
+      {step===2&&(
+        <div className="card">
+          <p style={{fontSize:13,color:"#555",marginBottom:14}}>อัปโหลดไฟล์ที่ต้องการตรวจสอบ</p>
+          <div onClick={()=>fileRef.current?.click()} style={{border:`1.5px dashed ${file?"#1D9E75":"#d3d1c7"}`,borderRadius:10,padding:"22px 16px",textAlign:"center",cursor:"pointer",background:file?"#e1f5ee":"#f8f8f6",marginBottom:12}}>
+            <input ref={fileRef} type="file" accept="video/*,audio/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith("video/")&&!f.type.startsWith("audio/")){setError("รองรับเฉพาะ Video/Audio");return;}setFile(f);setError("");}} style={{display:"none"}}/>
+            {file?(
+              <div>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"#1D9E75",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 6px"}}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 6l3 3 6-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <div style={{fontSize:13,fontWeight:500,color:"#085041"}}>{file.name}</div>
+                <div style={{fontSize:11,color:"#0f6e56",marginTop:1}}>{(file.size/1024/1024).toFixed(1)} MB · คลิกเพื่อเปลี่ยน</div>
+              </div>
+            ):(
+              <div>
+                <div style={{fontSize:13,fontWeight:500,color:"#888",marginBottom:2}}>คลิกเพื่อเลือกไฟล์</div>
+                <div style={{fontSize:11,color:"#aaa"}}>MP4, MOV, MP3, M4A, WAV</div>
+              </div>
+            )}
+          </div>
+
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"#888",marginBottom:4}}>
+              Script ต้นฉบับ <span style={{background:"#e6f1fb",color:"#0c447c",padding:"0 5px",borderRadius:3,fontSize:10}}>ไม่บังคับ</span>
+              <span style={{fontSize:10,color:"#aaa",marginLeft:6}}>— ถ้าไม่มี Claude จะใช้ {crit?.label} Knowledge แทน</span>
+            </div>
+            <textarea value={script} onChange={e=>setScript(e.target.value)} placeholder="วาง Script ต้นฉบับที่นี่ (ถ้ามี)..." style={{height:70,lineHeight:1.6,fontFamily:"monospace",fontSize:12}}/>
+          </div>
+
+          {/* Progress */}
           {loading&&(
             <div style={{background:"#f8f8f6",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
                 <span style={{fontSize:12,fontWeight:500}}>{PHASE_LBL[phase]}</span>
                 <span style={{fontSize:11,color:"#888"}}>{Math.round(progress)}%</span>
               </div>
-              <div style={{height:4,background:"#e8e6e0",borderRadius:2,marginBottom:10,overflow:"hidden"}}>
+              <div style={{height:4,background:"#e8e6e0",borderRadius:2,marginBottom:8,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${progress}%`,background:"#1D9E75",borderRadius:2,transition:"width .5s"}}/>
-              </div>
-              <div style={{display:"flex",gap:16,marginBottom:8}}>
-                {["อัปโหลด","ถอดเสียง","วิเคราะห์"].map((lbl,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
-                    <div style={{width:18,height:18,borderRadius:"50%",background:phase>i+1?"#1D9E75":phase===i+1?"#1a1a18":"#e8e6e0",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {phase>i+1?<svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2 4-4" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      :<div style={{width:5,height:5,borderRadius:"50%",background:phase===i+1?"#fff":"#b4b2a9"}}/>}
-                    </div>
-                    <span style={{fontSize:11,color:phase===i+1?"#1a1a18":"#aaa",fontWeight:phase===i+1?500:400}}>{lbl}</span>
-                  </div>
-                ))}
               </div>
               <div style={{fontSize:11,color:"#666"}}>{status}</div>
             </div>
@@ -293,17 +430,60 @@ Checklist: ${enabled}
 
           {error&&<div style={{background:"#fcebeb",color:"#791f1f",fontSize:12,padding:"8px 12px",borderRadius:8,marginBottom:10}}>{error}</div>}
           <div style={{display:"flex",gap:8}}>
-            <button disabled={loading} onClick={()=>!loading&&setStep(1)} style={{opacity:loading?.4:1}}>← ย้อนกลับ</button>
+            <button onClick={()=>setStep(1)} disabled={loading}>← ย้อนกลับ</button>
             {loading
-              ?<button onClick={stop} style={{flex:1,background:"#fcebeb",color:"#791f1f",border:"0.5px solid #f09595"}}>หยุด</button>
-              :<button className="primary" onClick={run} style={{flex:1,fontSize:13,padding:"8px 18px"}}>เริ่มตรวจสอบ "{file?.name}" →</button>
+              ?<button onClick={()=>{abortRef.current=true;setPhase(0);setProgress(0);setStatus("");}} style={{flex:1,background:"#fcebeb",color:"#791f1f",border:"0.5px solid #f09595"}}>หยุด</button>
+              :<button className="primary" onClick={runTranscribe} disabled={!file} style={{flex:1,fontSize:13,padding:"8px"}}>ถอดเสียงและไปตรวจ Transcript →</button>
             }
           </div>
         </div>
       )}
 
-      {/* Step 3 */}
-      {step===3&&result&&(
+      {/* ── Step 3: Transcript Review ── */}
+      {step===3&&(
+        <div className="card">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:500,marginBottom:3}}>ตรวจสอบและแก้ไข Transcript</div>
+              <div style={{fontSize:11,color:"#888"}}>AssemblyAI ถอดมา — กรุณาแก้คำที่ผิดก่อนส่งให้ Claude วิเคราะห์</div>
+            </div>
+            <span style={{fontSize:10,background:"#eeedfe",color:"#3c3489",padding:"2px 8px",borderRadius:8,fontWeight:500,flexShrink:0}}>{txLines.length} บรรทัด</span>
+          </div>
+
+          <div style={{border:"0.5px solid #d3d1c7",borderRadius:10,overflow:"hidden",marginBottom:14,maxHeight:360,overflowY:"auto"}}>
+            {txLines.map((line,i)=>(
+              <div key={i} style={{display:"flex",gap:0,borderBottom:i<txLines.length-1?"0.5px solid #f1efe8":"none"}}>
+                <div style={{width:52,flexShrink:0,padding:"7px 8px",background:"#f8f8f6",borderRight:"0.5px solid #e8e6e0",fontFamily:"monospace",fontSize:11,color:"#888",lineHeight:"20px"}}>{line.ts}</div>
+                <input type="text" value={line.text} onChange={e=>{const nl=[...txLines];nl[i]={...nl[i],text:e.target.value};setTxLines(nl);}} style={{flex:1,border:"none",borderRadius:0,padding:"7px 10px",fontSize:12,lineHeight:"20px",background:i%2===0?"#fff":"#fafaf8"}}/>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:"#faeeda",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:11,color:"#633806"}}>
+            แก้คำผิดที่ AssemblyAI ถอดผิดในตารางด้านบนก่อน — Timestamp ซ้ายมือจะถูกนำไปใช้ใน .srt โดยตรง
+          </div>
+
+          {phase===3&&(
+            <div style={{background:"#f8f8f6",borderRadius:10,padding:"10px 14px",marginBottom:12}}>
+              <div style={{fontSize:12,color:"#555",marginBottom:4}}>{status}</div>
+              <div style={{height:3,background:"#e8e6e0",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:"60%",background:"#7F77DD",borderRadius:2,animation:"pulse 1.5s ease-in-out infinite"}}/>
+              </div>
+            </div>
+          )}
+
+          {error&&<div style={{background:"#fcebeb",color:"#791f1f",fontSize:12,padding:"8px 12px",borderRadius:8,marginBottom:10}}>{error}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setStep(2)} disabled={phase===3}>← ย้อนกลับ</button>
+            <button className="primary" onClick={runAnalysis} disabled={phase===3||txLines.length===0} style={{flex:1,fontSize:13,padding:"8px"}}>
+              {phase===3?status:`วิเคราะห์ด้วย Claude (${crit?.label}) →`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 4: Results ── */}
+      {step===4&&result&&(
         <div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
             <div style={{display:"flex",alignItems:"baseline",gap:10}}>
@@ -312,31 +492,32 @@ Checklist: ${enabled}
             </div>
             <div style={{display:"flex",gap:6}}>
               <button onClick={downloadSrt} style={{fontWeight:500}}>⬇ .srt (FCPX)</button>
-              <button onClick={()=>{setStep(1);setResult(null);setFile(null);setPhase(0);setProgress(0);setError("");}}>ตรวจใหม่</button>
+              <button onClick={downloadReport}>⬇ Report</button>
+              <button onClick={()=>{setStep(1);setResult(null);setFile(null);setCriteria(null);setTxLines([]);setExtraRules([]);setPhase(0);setError("");}}>ตรวจใหม่</button>
             </div>
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
-            {[{l:"ปัญหาทั้งหมด",v:result.stats.total_issues,c:"#1a1a18"},{l:"Critical",v:result.stats.critical,c:"#e24b4a"},{l:"Warning",v:result.stats.warning,c:"#ba7517"},{l:"Info",v:result.stats.info,c:"#185fa5"}].map(m=>(
+            {[{l:"ปัญหา",v:result.stats.total_issues,c:"#1a1a18"},{l:"Critical",v:result.stats.critical,c:"#e24b4a"},{l:"Warning",v:result.stats.warning,c:"#ba7517"},{l:"Suggestions",v:(result.suggestions||[]).length,c:"#185fa5"}].map(m=>(
               <div key={m.l} className="metric"><div style={{fontSize:10,color:"#888",marginBottom:3}}>{m.l}</div><div style={{fontSize:22,fontWeight:500,color:m.c}}>{m.v}</div></div>
             ))}
           </div>
 
           <div style={{display:"flex",borderBottom:"0.5px solid #d3d1c7",marginBottom:12}}>
-            {[["report","รายงานปัญหา"],["transcript","Transcript"],["srt","Preview .srt"]].map(([id,lbl])=>(
-              <button key={id} onClick={()=>setActiveTab(id)} style={{fontSize:12,padding:"7px 14px",border:"none",background:"transparent",borderBottom:`2px solid ${activeTab===id?"#1a1a18":"transparent"}`,color:activeTab===id?"#1a1a18":"#888",fontWeight:activeTab===id?500:400,borderRadius:0}}>{lbl}</button>
+            {[["issues","ปัญหาที่พบ"],["suggestions","Suggestions"],["transcript","Transcript"],["srt",".srt"]].map(([id,lbl])=>(
+              <button key={id} onClick={()=>setActiveTab(id)} style={{fontSize:12,padding:"7px 12px",border:"none",background:"transparent",borderBottom:`2px solid ${activeTab===id?"#1a1a18":"transparent"}`,color:activeTab===id?"#1a1a18":"#888",fontWeight:activeTab===id?500:400,borderRadius:0}}>{lbl}</button>
             ))}
           </div>
 
-          {activeTab==="report"&&(
+          {activeTab==="issues"&&(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {result.issues.length===0?<div style={{textAlign:"center",padding:30,color:"#888"}}>ไม่พบปัญหา</div>
-              :result.issues.map((iss,i)=>{
+              {result.issues?.length===0&&<div style={{textAlign:"center",padding:30,color:"#888"}}>ไม่พบปัญหา</div>}
+              {(result.issues||[]).map((iss,i)=>{
                 const bd={critical:"#e24b4a",warning:"#ef9f27",info:"#378add"}[iss.severity];
                 const bg={critical:"#fcebeb",warning:"#faeeda",info:"#e6f1fb"}[iss.severity];
                 const tc={critical:"#791f1f",warning:"#633806",info:"#0c447c"}[iss.severity];
                 return(
-                  <div key={i} style={{border:"0.5px solid #d3d1c7",borderLeft:`3px solid ${bd}`,borderRadius:"0 10px 10px 0",padding:"10px 13px",background:"#fff"}}>
+                  <div key={i} style={{border:"0.5px solid #d3d1c7",borderLeft:`3px solid ${bd}`,borderRadius:"0 10px 10px 0",padding:"10px 13px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                       <code style={{fontSize:11,background:"#f1efe8",padding:"1px 6px",borderRadius:4,color:"#555"}}>{iss.timestamp}</code>
                       <span style={{background:bg,color:tc,fontSize:10,fontWeight:500,padding:"2px 7px",borderRadius:10}}>{iss.severity==="critical"?"Critical":iss.severity==="warning"?"Warning":"Info"}</span>
@@ -347,21 +528,59 @@ Checklist: ${enabled}
                   </div>
                 );
               })}
-              {(result.passed||[]).map((p,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#eaf3de",borderRadius:8}}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#1D9E75"/><path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  <span style={{fontSize:12,color:"#27500a"}}>{p}</span>
+              {(result.passed||[]).length>0&&(
+                <div style={{marginTop:4}}>
+                  <div style={{fontSize:11,color:"#888",marginBottom:6}}>ผ่านเกณฑ์</div>
+                  {result.passed.map((p,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#eaf3de",borderRadius:8,marginBottom:4}}>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#1D9E75"/><path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <span style={{fontSize:12,color:"#27500a"}}>{p}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab==="suggestions"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(result.suggestions||[]).length===0&&<div style={{textAlign:"center",padding:30,color:"#888"}}>ไม่มี Suggestion</div>}
+              {(result.suggestions||[]).map((s,i)=>{
+                const pc={high:"#e24b4a",medium:"#ba7517",low:"#185fa5"}[s.priority]||"#888";
+                const pb={high:"#fcebeb",medium:"#faeeda",low:"#e6f1fb"}[s.priority]||"#f1efe8";
+                const pt={high:"#791f1f",medium:"#633806",low:"#0c447c"}[s.priority]||"#555";
+                return(
+                  <div key={i} style={{border:`0.5px solid #d3d1c7`,borderLeft:`3px solid ${pc}`,borderRadius:"0 10px 10px 0",padding:"10px 13px",background:"#fff"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                      <span style={{background:pb,color:pt,fontSize:10,fontWeight:500,padding:"2px 7px",borderRadius:10}}>{s.priority==="high"?"สำคัญสูง":s.priority==="medium"?"สำคัญกลาง":"แนะนำ"}</span>
+                      <span style={{fontSize:12,fontWeight:500}}>{s.topic}</span>
+                    </div>
+                    <div style={{fontSize:12,color:"#555",lineHeight:1.6}}>{s.detail}</div>
+                  </div>
+                );
+              })}
+              <div style={{background:"#e6f1fb",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#0c447c",marginTop:4}}>
+                Suggestions เหล่านี้มาจาก Domain Knowledge ของ Claude ({crit?.label}) — ไม่ได้อ้างอิง Script
+              </div>
+            </div>
+          )}
+
+          {activeTab==="transcript"&&(
+            <div style={{background:"#f1efe8",borderRadius:10,overflow:"hidden",maxHeight:320,overflowY:"auto"}}>
+              {txLines.map((l,i)=>(
+                <div key={i} style={{display:"flex",gap:0,borderBottom:i<txLines.length-1?"0.5px solid #e8e6e0":"none"}}>
+                  <div style={{width:52,flexShrink:0,padding:"6px 8px",background:"#eae8e2",fontFamily:"monospace",fontSize:11,color:"#888"}}>{l.ts}</div>
+                  <div style={{flex:1,padding:"6px 10px",fontSize:12,background:i%2===0?"#f8f8f6":"#f1efe8"}}>{l.text}</div>
                 </div>
               ))}
             </div>
           )}
-          {activeTab==="transcript"&&(
-            <div style={{background:"#f1efe8",borderRadius:10,padding:14,fontFamily:"monospace",fontSize:12,lineHeight:2,whiteSpace:"pre-wrap",maxHeight:300,overflowY:"auto"}}>{transcript||"ไม่มี Transcript"}</div>
-          )}
+
           {activeTab==="srt"&&(
             <div>
               <div style={{background:"#12121c",borderRadius:10,padding:14,fontFamily:"monospace",fontSize:11,lineHeight:1.9,color:"#c8c6c0",marginBottom:10,maxHeight:280,overflowY:"auto"}}>
-                {result.issues.map((iss,i)=>{const s=tsToSec(iss.timestamp),e=s+4;return(
+                {(result.issues||[]).length===0?<span style={{color:"#5DCAA5"}}>ไม่มีปัญหา ไม่มี Marker</span>
+                :(result.issues||[]).map((iss,i)=>{const s=tsToSec(iss.timestamp),e=s+4;return(
                   <div key={i} style={{marginBottom:12}}>
                     <div style={{color:"#7F77DD"}}>{i+1}</div>
                     <div style={{color:"#5DCAA5"}}>{fmtSec(s)} --&gt; {fmtSec(e)}</div>
