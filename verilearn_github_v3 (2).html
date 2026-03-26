@@ -119,16 +119,54 @@ function App(){
       setStatus(`AssemblyAI กำลังถอดเสียง... (${txData.status})`);
     }
 
+    const DEAD_AIR_MS = 2000;  // ช่องว่าง >= 2 วินาที = Dead Air
+    const CHUNK_GAP_MS = 800;  // ช่องว่าง >= 0.8 วินาที = ขึ้นบรรทัดใหม่
+
     let lines=[];
     if(txData.words?.length){
+      const words=txData.words;
       let chunk=[],cs=0;
-      txData.words.forEach((w,i)=>{
-        if(!chunk.length) cs=w.start;
+      for(let i=0;i<words.length;i++){
+        const w=words[i];
+        if(!chunk.length){ cs=w.start; }
+        // ตรวจ gap กับคำก่อนหน้า
+        if(i>0){
+          const gap=w.start - words[i-1].end;
+          if(gap>=DEAD_AIR_MS){
+            // บันทึก chunk ก่อนหน้า (ถ้ามี)
+            if(chunk.length) { lines.push({ts:msToMmss(cs),text:chunk.join(" ")}); chunk=[]; }
+            // แทรก Dead Air marker
+            const deadSec=(gap/1000).toFixed(1);
+            lines.push({ts:msToMmss(words[i-1].end), text:`[Dead Air: ${deadSec}s]`, isDeadAir:true});
+            cs=w.start;
+          } else if(gap>=CHUNK_GAP_MS){
+            // ขึ้นบรรทัดใหม่เมื่อหยุดพักสั้น
+            if(chunk.length){ lines.push({ts:msToMmss(cs),text:chunk.join(" ")}); chunk=[]; }
+            cs=w.start;
+          }
+        }
         chunk.push(w.text);
-        if(chunk.length>=10||i===txData.words.length-1){lines.push({ts:msToMmss(cs),text:chunk.join(" ")});chunk=[];}
-      });
+        // ขึ้นบรรทัดใหม่เมื่อยาวเกิน 15 คำ
+        if(chunk.length>=15){
+          lines.push({ts:msToMmss(cs),text:chunk.join(" ")});
+          chunk=[];
+          if(i+1<words.length) cs=words[i+1].start;
+        }
+      }
+      if(chunk.length) lines.push({ts:msToMmss(cs),text:chunk.join(" ")});
     } else if(txData.utterances?.length){
-      lines=txData.utterances.map(u=>({ts:msToMmss(u.start),text:u.text}));
+      // ตรวจ Dead Air ระหว่าง Utterances
+      for(let i=0;i<txData.utterances.length;i++){
+        const u=txData.utterances[i];
+        if(i>0){
+          const gap=u.start - txData.utterances[i-1].end;
+          if(gap>=DEAD_AIR_MS){
+            const deadSec=(gap/1000).toFixed(1);
+            lines.push({ts:msToMmss(txData.utterances[i-1].end), text:`[Dead Air: ${deadSec}s]`, isDeadAir:true});
+          }
+        }
+        lines.push({ts:msToMmss(u.start),text:u.text});
+      }
     } else {
       lines=[{ts:"0:00",text:txData.text||""}];
     }
@@ -146,15 +184,13 @@ function App(){
 - ตัดคำผิดตำแหน่ง เช่น "สาร ตั้งต้น" ควรเป็น "สารตั้งต้น"
 - คำที่เสียงใกล้เคียงกันแต่ผิดความหมาย
 - คำทับศัพท์หรือชื่อเฉพาะที่ถอดผิด
-- ช่วง Dead air ที่ไม่มีการพูดเกิน 3 วินาที
 
 กฎ:
 1. แก้ไขเฉพาะตัวอักษรและคำที่ผิดเท่านั้น
 2. ห้ามเปลี่ยนความหมาย ห้ามเพิ่มหรือลดคำ
 3. รักษา Timestamp เดิมทุกบรรทัด ห้ามแก้ Timestamp
 4. ห้ามเพิ่มหรือลดจำนวนบรรทัด
-5. คำไหนไม่แน่ใจ ให้คงต้นฉบับไว้ ไม่ต้องแปลหรือแก้ไขคำ
-6. ตอบในรูปแบบ timestamp|||ข้อความ เท่านั้น ห้ามมีคำอธิบายเพิ่มเติม
+5. ตอบในรูปแบบ timestamp|||ข้อความ เท่านั้น ห้ามมีคำอธิบายเพิ่มเติม
 
 Transcript:
 ${raw}`;
@@ -197,7 +233,7 @@ ${raw}`;
     setPhase(4);setStatus("Claude กำลังวิเคราะห์ตาม Criteria...");
 
     const txText=txLines.map(l=>`${l.ts} ${l.text}`).join("\n");
-    const allRules=[...(crit?.rules||[]),...extraRules].map((r,i)=>`${i+1}. ${r}`).join("\n");
+    const allRules=[...(crit?.rules||[]),...extraRules,"Dead Air (หยุดนิ่งนานผิดปกติ >= 2 วินาที)"].map((r,i)=>`${i+1}. ${r}`).join("\n");
     const hasScript=script.trim().length>0;
 
     const prompt=`${crit?.prompt||"คุณเป็น QA ผู้เชี่ยวชาญด้านสื่อวิดีโอ"}
@@ -446,9 +482,9 @@ ${hasScript?`Script ต้นฉบับ:\n${script}`:"ไม่มี Script �
               <div style={{flex:1,padding:"5px 10px",fontSize:10,color:"#888",fontWeight:500}}>ข้อความ (แก้ได้)</div>
             </div>
             {txLines.map((line,i)=>(
-              <div key={i} style={{display:"flex",borderBottom:i<txLines.length-1?"0.5px solid #f1efe8":"none"}}>
-                <div style={{width:56,flexShrink:0,padding:"7px 8px",background:"#f8f8f6",borderRight:"0.5px solid #e8e6e0",fontFamily:"monospace",fontSize:11,color:"#888",display:"flex",alignItems:"center"}}>{line.ts}</div>
-                <input type="text" value={line.text} onChange={e=>{const nl=[...txLines];nl[i]={...nl[i],text:e.target.value};setTxLines(nl);}} style={{flex:1,border:"none",borderRadius:0,padding:"7px 10px",fontSize:12,background:i%2===0?"#fff":"#fafaf8"}}/>
+          <div key={i} style={{display:"flex",borderBottom:i<txLines.length-1?"0.5px solid #f1efe8":"none",background:line.isDeadAir?"#faeeda":"transparent"}}>
+                <div style={{width:56,flexShrink:0,padding:"7px 8px",background:line.isDeadAir?"#f5d9a0":"#f8f8f6",borderRight:"0.5px solid #e8e6e0",fontFamily:"monospace",fontSize:11,color:"#888",display:"flex",alignItems:"center"}}>{line.ts}</div>
+                <input type="text" value={line.text} onChange={e=>{const nl=[...txLines];nl[i]={...nl[i],text:e.target.value};setTxLines(nl);}} style={{flex:1,border:"none",borderRadius:0,padding:"7px 10px",fontSize:12,background:line.isDeadAir?"#faeeda":i%2===0?"#fff":"#fafaf8",color:line.isDeadAir?"#854F0B":"#1a1a18",fontWeight:line.isDeadAir?500:400}}/>
               </div>
             ))}
           </div>
