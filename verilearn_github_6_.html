@@ -59,8 +59,10 @@ function Toggle({on,onChange}){
 }
 
 function fmtSec(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")},000`;}
-function msToMmss(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60),sc=s%60;return`${m}:${String(sc).padStart(2,"0")}`;}
-function secToMmss(s){const m=Math.floor(s/60),sc=Math.floor(s%60);return`${m}:${String(sc).padStart(2,"0")}`;}
+function msToSec(ms){return Math.floor(ms/1000);}
+function secToDisplay(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);return h>0?`${h}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`:`${m}:${String(sc).padStart(2,"0")}`;}
+function msToMmss(ms){return secToDisplay(msToSec(ms));}
+function secToMmss(s){return secToDisplay(s);}
 function tsToSec(ts="0:00"){const p=ts.trim().replace(",000","").split(":").map(Number);return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+(p[1]||0);}
 
 async function callClaude(antKey,messages,maxTokens=3000){
@@ -237,7 +239,13 @@ ${raw}`;
     const reply=await callClaude(antKey.trim(),[{role:"user",content:prompt}],4000);
     const corrected=reply.split("\n").map(line=>{
       const idx=line.indexOf("|||");if(idx<0) return null;
-      return {ts:line.slice(0,idx).trim(),text:line.slice(idx+3).trim()};
+      const tsStr=line.slice(0,idx).trim();
+      const text=line.slice(idx+3).trim();
+      const isDeadAir=text.startsWith("[Dead Air");
+      // หา tsSec จาก txLines เดิมที่ตรงกัน หรือ parse จาก string
+      const orig=lines.find(l=>l.ts===tsStr);
+      const tsSec=orig?orig.tsSec:tsToSec(tsStr);
+      return {ts:tsStr,tsSec,text,isDeadAir};
     }).filter(l=>l&&l.ts&&l.text);
     if(corrected.length===0) throw new Error("Claude แก้ Transcript ไม่สำเร็จ กรุณาลองใหม่");
     return corrected;
@@ -289,24 +297,27 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
     if(vRules.length===0) return [];
 
     setPhase(5);setProgress(0);setStatus("กำลังดึง Frame จาก Video (ทุก 10 วินาที)...");
-    const frames=await extractFrames(file,SAMPLE_SEC,(done,total)=>{
+          const frames=await extractFrames(file,SAMPLE_SEC,(done,total)=>{
       setProgress(Math.round(done/total*40));
       setStatus(`ดึง Frame ${done}/${total}...`);
     });
     if(abortRef.current) return [];
-
     setStatus(`ได้ ${frames.length} Frame — Claude Vision กำลังวิเคราะห์...`);
     const allIssues=[];
     const batches=[];
     for(let i=0;i<frames.length;i+=BATCH_SIZE) batches.push(frames.slice(i,i+BATCH_SIZE));
-
     for(let bi=0;bi<batches.length;bi++){
       if(abortRef.current) break;
       setProgress(40+Math.round((bi/batches.length)*55));
       setStatus(`Claude Vision วิเคราะห์ Batch ${bi+1}/${batches.length}...`);
       try{
         const issues=await analyzeFrameBatch(antKey.trim(),batches[bi],vRules);
-        allIssues.push(...issues);
+        // แนบ tsSec จริงจาก Frame แทนการ parse จาก string
+        const withSec=issues.map(iss=>{
+          const frame=batches[bi].find(f=>f.mmss===iss.timestamp);
+          return {...iss, tsSec: frame ? frame.ts : tsToSec(iss.timestamp)};
+        });
+        allIssues.push(...withSec);
       }catch(e){console.warn("Batch",bi,"error:",e.message);}
       await new Promise(r=>setTimeout(r,500));
     }
@@ -325,9 +336,9 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
       if(abortRef.current) return;
 
       const allIssues=[
-        ...(audioResult.issues||[]).map(i=>({...i,source:"audio"})),
-        ...visualIssues.map(i=>({...i,source:"visual"})),
-      ].sort((a,b)=>tsToSec(a.timestamp)-tsToSec(b.timestamp));
+        ...(audioResult.issues||[]).map(i=>({...i,source:"audio",tsSec:i.tsSec??tsToSec(i.timestamp)})),
+        ...visualIssues.map(i=>({...i,source:"visual",tsSec:i.tsSec??tsToSec(i.timestamp)})),
+      ].sort((a,b)=>a.tsSec-b.tsSec);
 
       const stats={
         total_issues:allIssues.length,
@@ -342,7 +353,12 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
   };
 
   const downloadSrt=()=>{
-    const lines=(result?.issues||[]).map((iss,i)=>{const s=tsToSec(iss.timestamp),e=s+4;return`${i+1}\n${fmtSec(s)} --> ${fmtSec(e)}\n[${iss.source?.toUpperCase()}][${iss.type}] ${iss.description}`;});
+    const lines=(result?.issues||[]).map((iss,i)=>{
+      // ใช้ tsSec ที่เก็บไว้โดยตรง ไม่ต้อง parse string อีกรอบ
+      const s=iss.tsSec??tsToSec(iss.timestamp);
+      const e=s+4;
+      return`${i+1}\n${fmtSec(s)} --> ${fmtSec(e)}\n[${iss.source?.toUpperCase()}][${iss.type}] ${iss.description}`;
+    });
     const blob=new Blob([lines.join("\n\n")],{type:"text/plain;charset=utf-8"});
     const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="verilearn_markers.srt";a.click();URL.revokeObjectURL(url);
   };
