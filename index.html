@@ -358,13 +358,33 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
       const audioRaw=parseJSON(audioReply);
       if(abortRef.current) return;
 
-      // Normalize audio issues — tsSec จาก Transcript lines เดิม
-      const audioIssues=(audioRaw.issues||[]).map(iss=>{
-        const ts=safeStr(iss.timestamp)||"0:00";
-        const orig=txLines.find(l=>l.ts===ts);
-        const tsSec=orig?orig.tsSec:0;
-        return {tsSec,timestamp:ts,source:"audio",type:safeStr(iss.type)||"Audio",severity:safeSev(iss.severity),description:safeStr(iss.description),suggestion:safeStr(iss.suggestion)};
-      });
+      // Normalize audio issues — closest tsSec match แทน exact string match
+      const audioIssues=(audioRaw.issues||[])
+        .filter(iss=>!safeStr(iss.type).toLowerCase().includes("dead air")) // ตัด Dead Air ออก จะใส่เองจาก txLines
+        .map(iss=>{
+          const ts=safeStr(iss.timestamp)||"0:00";
+          // หา tsSec จาก txLines โดย parse ts แล้วหาค่าที่ใกล้ที่สุด
+          const parsed=ts.split(":").map(Number);
+          const querySec=parsed.length===3?parsed[0]*3600+parsed[1]*60+parsed[2]:parsed[0]*60+(parsed[1]||0);
+          let best=txLines[0];
+          let bestDiff=Infinity;
+          for(const l of txLines){
+            const diff=Math.abs(l.tsSec-querySec);
+            if(diff<bestDiff){bestDiff=diff;best=l;}
+          }
+          const tsSec=best?best.tsSec:querySec;
+          return {tsSec,timestamp:secToHms(tsSec),source:"audio",type:safeStr(iss.type)||"Audio",severity:safeSev(iss.severity),description:safeStr(iss.description),suggestion:safeStr(iss.suggestion)};
+        });
+
+      // Dead Air — ดึงจาก txLines โดยตรง ไม่ผ่าน Claude
+      const deadAirIssues=txLines
+        .filter(l=>l.isDeadAir)
+        .map(l=>{
+          const m=l.text.match(/Dead Air:\s*([\d.]+)s/);
+          const dur=m?parseFloat(m[1]):0;
+          const sev=dur>=5?"critical":dur>=3?"warning":"info";
+          return {tsSec:l.tsSec,timestamp:l.ts,source:"audio",type:"Dead Air",severity:sev,description:`หยุดนิ่ง ${dur.toFixed(1)} วินาที`,suggestion:"ตรวจสอบว่าตั้งใจหยุด หรือควรตัดออก"};
+        });
       setProgress(40);
 
       // Phase 5: Visual Analysis
@@ -397,7 +417,7 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
       if(abortRef.current) return;
 
       // Combine + sort by tsSec
-      const allIssues=[...audioIssues,...visualIssues].sort((a,b)=>a.tsSec-b.tsSec);
+      const allIssues=[...audioIssues,...deadAirIssues,...visualIssues].sort((a,b)=>a.tsSec-b.tsSec);
       const stats={
         total_issues:allIssues.length,
         critical:allIssues.filter(i=>i.severity==="critical").length,
@@ -412,7 +432,7 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
         suggestions:(audioRaw.suggestions||[]).map(s=>({topic:safeStr(s.topic),detail:safeStr(s.detail),priority:["high","medium","low"].includes(s.priority)?s.priority:"low"})),
         passed:   (audioRaw.passed||[]).map(safeStr),
         stats,
-        audio_count:audioIssues.length,
+        audio_count:audioIssues.length+deadAirIssues.length,
         visual_count:visualIssues.length,
       };
       setResult(finalResult);
