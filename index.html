@@ -49,8 +49,8 @@ const VISUAL_CRITERIA=[
 
 const ASMB="https://api.assemblyai.com";
 const ANT="https://api.anthropic.com/v1/messages";
-const SAMPLE_SEC=10;
-const BATCH_SIZE=5;
+const BATCH_SIZE=4;
+const SAMPLE_OPTIONS=[1,3,5,10];
 
 function Toggle({on,onChange}){
   return <div onClick={onChange} style={{width:32,height:18,borderRadius:9,background:on?"#1D9E75":"#b4b2a9",position:"relative",cursor:"pointer",flexShrink:0,transition:"background .2s"}}>
@@ -118,23 +118,38 @@ function extractFrames(videoFile,intervalSec,onProgress){
 }
 
 // ── ส่ง Batch Frame ให้ Claude Vision ─────────────────────────
+// ให้ Claude รายงาน frame_index แทน timestamp เพื่อหลีกเลี่ยง Parse error
 async function analyzeFrameBatch(antKey,frames,visualRules){
   const content=[];
-  frames.forEach(f=>{
-    content.push({type:"text",text:`=== Frame ${f.mmss} ===`});
+  frames.forEach((f,idx)=>{
+    content.push({type:"text",text:`=== Frame index:${idx} (${f.mmss}) ===`});
     content.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:f.b64}});
   });
   content.push({type:"text",text:`วิเคราะห์ Frame ด้านบนตามเกณฑ์:
 ${visualRules.map((r,i)=>`${i+1}. ${r}`).join("\n")}
 
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown:
-{"issues":[{"timestamp":"<MM:SS>","type":"<ประเภท>","severity":"<critical|warning|info>","description":"<ปัญหา>","suggestion":"<แนะนำ>"}]}
-ถ้าไม่พบปัญหาใดเลย ตอบ: {"issues":[]}`});
+{"issues":[{"frame_index":<0-${frames.length-1}>,"type":"<ประเภท>","severity":"<critical|warning|info>","description":"<ปัญหา>","suggestion":"<แนะนำ>"}]}
+ถ้าไม่พบปัญหา ตอบ: {"issues":[]}`});
 
   const reply=await callClaude(antKey,[{role:"user",content}],1500);
   const m=reply.match(/\{[\s\S]*\}/);
   if(!m) return [];
-  try{return JSON.parse(m[0]).issues||[];}catch{return [];}
+  try{
+    const parsed=JSON.parse(m[0]);
+    return (parsed.issues||[]).map(iss=>{
+      // ดึง tsSec จาก Frame Object ตรงๆ — ไม่ต้อง Parse string เลย
+      const frame=frames[iss.frame_index]??frames[frames.length-1];
+      return {
+        timestamp: frame.mmss,
+        tsSec:     frame.ts,       // <-- ค่าจริงจาก Canvas seek
+        type:      iss.type,
+        severity:  iss.severity,
+        description: iss.description,
+        suggestion:  iss.suggestion,
+      };
+    });
+  }catch{return [];}
 }
 
 function App(){
@@ -154,7 +169,7 @@ function App(){
   const [txLines,setTxLines]=useState([]);
   const [result,setResult]=useState(null);
   const [error,setError]=useState("");
-  const [activeTab,setActiveTab]=useState("issues");
+  const [sampleSec,setSampleSec]=useState(5);
   const fileRef=useRef();
   const abortRef=useRef(false);
 
@@ -297,7 +312,7 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
     if(vRules.length===0) return [];
 
     setPhase(5);setProgress(0);setStatus("กำลังดึง Frame จาก Video (ทุก 10 วินาที)...");
-          const frames=await extractFrames(file,SAMPLE_SEC,(done,total)=>{
+          const frames=await extractFrames(file,sampleSec,(done,total)=>{
       setProgress(Math.round(done/total*40));
       setStatus(`ดึง Frame ${done}/${total}...`);
     });
@@ -468,7 +483,18 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
             ))}
           </div>
 
-          <div style={{fontSize:11,fontWeight:500,color:"#555",marginBottom:8}}>Visual Criteria (Frame ทุก {SAMPLE_SEC} วินาที)</div>
+          <div style={{fontSize:11,fontWeight:500,color:"#555",marginBottom:8}}>Visual Criteria — Sample Rate</div>
+          <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"#888"}}>ดึง Frame ทุก</span>
+            {SAMPLE_OPTIONS.map(s=>(
+              <button key={s} onClick={()=>setSampleSec(s)} style={{padding:"4px 12px",fontSize:11,fontWeight:sampleSec===s?500:400,background:sampleSec===s?"#1a1a18":"#fff",color:sampleSec===s?"#fff":"#555",borderColor:sampleSec===s?"#1a1a18":"#d3d1c7",borderRadius:20}}>
+                {s} วิ
+              </button>
+            ))}
+            <span style={{fontSize:10,color:"#aaa",marginLeft:4}}>
+              {sampleSec===1?"แม่นยำสูง / Token มาก":sampleSec<=3?"สมดุล":sampleSec<=5?"แนะนำสำหรับ POC":"ประหยัด Token"}
+            </span>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:14}}>
             {VISUAL_CRITERIA.map(vc=>(
               <div key={vc.id} onClick={()=>toggleVRule(vc.id)} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"9px 11px",border:`0.5px solid ${visualRuleIds.includes(vc.id)?"#b4b2a9":"#e8e6e0"}`,borderRadius:9,cursor:"pointer",background:visualRuleIds.includes(vc.id)?"#fff":"#fafaf8"}}>
@@ -570,7 +596,7 @@ ${script.trim()?`Script ต้นฉบับ:\n${script}`:"ไม่มี Scri
           </div>
 
           <div style={{background:"#faeeda",borderRadius:8,padding:"7px 11px",marginBottom:14,fontSize:11,color:"#633806"}}>
-            หลังกดวิเคราะห์ — ระบบจะรัน Audio Analysis และ Visual Analysis (Frame ทุก {SAMPLE_SEC} วิ) อัตโนมัติ
+            หลังกดวิเคราะห์ — ระบบจะรัน Audio Analysis และ Visual Analysis (Frame ทุก {sampleSec} วิ) อัตโนมัติ
           </div>
 
           {error&&<div style={{background:"#fcebeb",color:"#791f1f",fontSize:12,padding:"8px 12px",borderRadius:8,marginBottom:10}}>{error}</div>}
